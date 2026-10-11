@@ -140,3 +140,15 @@ Each entry has the decision, the alternatives, and the trade-off.
 - **Alternatives:** Book an accrual at each end of day from the balances known then; calculate the credit as `round(sum of raw)` and adjust the daily values to match.
 - **Trade-off:** The `:accrual` records make "the rounded accruals sum exactly to the capitalized total" checkable from the journal itself, and the equality holds by construction. The credit follows the value dates, like the rule's definition of the closing balance. The cost is the rounding drift: the rounded accruals add up to 0.93, the exact interest is 0.918 (0.92). The known failing test shows this.
 - **Detail:** A day with zero interest still gets an `:accrual` record (amount 0). An account whose total is zero gets no `:interest` entry, because an entry of 0.00 moves no money.
+
+## D23. The report is data first, text second
+
+- **Decision:** `report/day-report` and `report/final-report` return plain maps. `report-lines` turns them into text, and `print-report` prints the lines. The scenario test checks the maps, and prints the text once.
+- **Alternatives:** Build the text directly while walking the journal; check the printed text in the tests.
+- **Trade-off:** The tests check numbers and states, not spacing, so a change of layout breaks no test. The cost is one more layer between the journal and the output.
+
+## D24. Each day block shows the view "as known at the end of that day"
+
+- **Decision:** The block for Day N uses `:known-at N` for balances, available balance and authorization states, and lists the fees, errors, back-dated entries and late arrivals posted on Day N. A final block shows the balances restated by value date and the interest check (`sum of accruals = capitalized`).
+- **Alternatives:** Print only the final restated balances; print each day block from the final journal without `:known-at`.
+- **Trade-off:** The reader sees what the bank knew each day (Day 4: 465.00) and how back-dated events changed the past (restated Day 4: 415.00). Both views come from the same journal. The cost is a longer report, and the reader must know which view each block shows (README, "Reading the report").
