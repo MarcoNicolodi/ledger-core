@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Ledger core — architecture and trade-offs</title>
+<style>body{font:10.5pt/1.4 -apple-system,Helvetica,Arial,sans-serif;margin:28px 36px;color:#111}h1{font-size:17pt;margin:0 0 4px}h2{font-size:12.5pt;margin:16px 0 4px;border-bottom:1px solid #ccc}p,li{margin:3px 0}table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:4px 0}td,th{border:1px solid #ccc;padding:3px 5px;vertical-align:top;text-align:left}th{background:#f2f2f2}code{font-size:9pt}</style></head><body>
+<h1>Ledger core — architecture, trade-offs, production</h1>
+<p>Pure Clojure core: one immutable state map, one append-only journal vector. Every balance, hold and authorization state is derived from the journal. Each record has a <code>posted-day</code> and a <code>value-date</code>, so any past view ("as known at Day N") is a filter, not a copy.</p>
+
+<h2>1. Append-only at scale</h2>
+<p><b>What breaks first at 100×:</b> the end-of-day run. Every query scans the whole journal (O(n)), and the fee run calls <code>balance</code> for every day from Day 1 to today, for every account. Cost per close is accounts × days × journal size, so 100× accounts and 100× events gives about 10,000× the work. <code>auth-state</code> scans the journal of all accounts, not one.</p>
+<p><b>Unbounded state:</b> (1) the journal itself, never compacted; (2) the fee look-back starts at Day 1 forever, so its range grows with every day; (3) one <code>:accrual</code> record per account per day; (4) <code>:known-at</code> views need all history in memory.</p>
+<p><b>Cheapest structural change:</b> partition the journal by account (<code>{account-id [records]}</code>). All reads already go through <code>journal/records</code>, so the change is local. Queries become O(records of one account), accounts can be processed in parallel and later sharded. Next step: a closed-day checkpoint record (closing balance by value date) plus a back-valuation horizon, so the look-back stops at the last checkpoint instead of Day 1.</p>
+
+<h2>2. Value-dated entries in production (UAE-licensed bank)</h2>
+<ul>
+<li><b>Restated history.</b> A back-dated entry changes balances that the customer already saw and that fees and interest already used. Statements need adjustment lines and customer notice.</li>
+<li><b>Fees and consumer protection.</b> CBUAE consumer-protection rules expect fees to be disclosed and fair; a fee caused by the bank's own wrong debit (E7) is a complaint and remediation case. VAT at 5% applies to explicit fees, and a back-dated fee can fall into a closed VAT period.</li>
+<li><b>Regulatory reporting and accounting.</b> CBUAE returns and the general ledger are point-in-time. Back-dated entries must post in the open period (booking date) while interest uses the value date.</li>
+<li><b>Fraud and AML.</b> Back-dating is a classic manipulation path (hide movements, avoid fees). It needs a full audit trail and monitoring under the UAE AML/CFT framework.</li>
+<li><b>Islamic products.</b> For Sharia-compliant accounts, "interest" is profit under a contract; value dating changes the profit calculation and needs Sharia-board-approved rules.</li>
+</ul>
+<p><b>Control before going live:</b> a back-valuation gate. Any entry whose value date is earlier than the previous business day needs a reason code and maker-checker approval, cannot fall into a locked period, and automatically produces a report of the fees and interest it changes.</p>
+
+<h2>3. Authorization lifecycle</h2>
+<p>In this model an authorization has only two terminal states: <i>settled</i> and <i>declined</i>. Every other path leaves it open or never creates it.</p>
+<table><tr><th>How it ends (not a matching settlement)</th><th>Real-world scenario</th><th>Behaviour I would mandate</th></tr>
+<tr><td>Declined at request (available &lt; 0 after hold)</td><td>Insufficient funds (Auth-B)</td><td>Final decline, reason code to the network, no fee, no hold. Never re-evaluated.</td></tr>
+<tr><td>Duplicate id rejected</td><td>Network retry of the same request</td><td>Idempotent: return the original decision, not an error.</td></tr>
+<tr><td>Never settled — hold stays forever (no expiry in model)</td><td>Merchant never captures: cancelled order, hotel or fuel pre-auth</td><td>Hold expiry by scheme/MCC rules (for example 7 days; up to 30 for hotel and car rental), released with reason <code>:expired</code>. A late capture after expiry is treated as a force post.</td></tr>
+<tr><td>Settlement above hold rejected — auth stays open</td><td>Tip, incremental charge, FX difference</td><td>MCC-based tolerance or incremental authorization; outside tolerance, an exception queue, not a silent reject.</td></tr>
+<tr><td>Settlement on another account rejected — auth stays open</td><td>Card reissue, routing error</td><td>Exception queue and investigation; hold released at expiry.</td></tr>
+<tr><td>No reversal path for a hold (not modelled)</td><td>Merchant void, customer cancel, network timeout reversal</td><td>Authorization reversal message releases the hold (full or partial) at once.</td></tr>
+<tr><td>Second settlement rejected (auth already settled)</td><td>Split shipment, multi-clearing</td><td>Keep the remaining hold until a final-clearing indicator.</td></tr>
+</table>
+
+<h2>4. What I cut and why</h2>
+<table><tr><th>Simplification</th><th>Production risk it defers</th></tr>
+<tr><td>No persistence, single-threaded reduce</td><td>Data loss on crash; double spend when two authorizations race on one balance. Needs a durable log and per-account serialization.</td></tr>
+<tr><td>No idempotency on event ids</td><td>A replayed or retried event posts twice.</td></tr>
+<tr><td>Single-sided ledger (no double entry, no GL accounts)</td><td>Fee income, interest expense and settlement suspense cannot be reconciled; conservation of money is not provable.</td></tr>
+<tr><td>Integer days, no calendar, cut-off or time zone</td><td>Wrong value dates around cut-offs, weekends and public holidays.</td></tr>
+<tr><td>Debits never gated, no overdraft limit</td><td>Unlimited credit exposure.</td></tr>
+<tr><td>Fees never refunded, no waiver workflow; no VAT on fees</td><td>Customer harm and tax errors (the 75.00 AED after E9).</td></tr>
+<tr><td>Fee only in AED, no FX</td><td>Negative non-AED accounts pay no fee (error record only).</td></tr>
+<tr><td>Simple interest, one rate, no day-count convention, no debit interest; per-day rounding</td><td>Wrong accruals for real products; 0.01 drift per account per window (the known failing test).</td></tr>
+<tr><td>No hold expiry, auth reversal, incremental auth or multi-clearing</td><td>Funds blocked forever; valid card flows rejected.</td></tr>
+<tr><td>Fixed accounts, no account lifecycle (open, freeze, close)</td><td>Postings to closed or blocked accounts.</td></tr>
+<tr><td>Validation reports the first error only; rejections are records with no alerting or retry</td><td>Slow diagnosis; silent build-up of rejected events.</td></tr>
+</table>
+</body></html>
