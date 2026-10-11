@@ -14,7 +14,7 @@
 (defn append [state record]
   (update state :journal conj (assoc record :seq (inc (count (:journal state))))))
 
-(defn- known-at? [known-at record]
+(defn known-at? [known-at record]
   (or (nil? known-at) (<= (:posted-day record) known-at)))
 
 (defn records [state account-id & {:keys [known-at]}]
@@ -49,3 +49,14 @@
 (defn available [state account-id day & {:keys [known-at]}]
   (- (balance state account-id day :known-at known-at)
      (active-holds state account-id :known-at known-at)))
+
+(defn event-record [event day record-type]
+  {:record/type record-type
+   :source      (:event/id event)
+   :posted-day  day
+   :account/id  (:account/id event)})
+
+(defn reject [state event day code detail]
+  (append state (assoc (event-record event day :rejection)
+                       :error/code code
+                       :error/detail detail)))

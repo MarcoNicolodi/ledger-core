@@ -67,3 +67,27 @@ Each entry has the decision, the alternatives, and the trade-off.
 - **Decision:** `money/split` gives n-1 parts of amount/n, rounded down. The last part takes the remainder (10.000 / 3 → 3.333, 3.333, 3.334).
 - **Alternatives:** The remainder goes to the first part; it is spread one minor unit at a time; the split is rejected.
 - **Trade-off:** The parts always add up exactly, and the rule is easy to state and to test. The choice of first or last part is arbitrary. "Last" means the customer sees the regular amount first.
+
+## D11. Rejections are journal records with an error code
+
+- **Decision:** A refused event appends a `:rejection` record with `:error/code` and `:error/detail`. It never throws, and no money moves.
+- **Alternatives:** Throw an exception; return an error and keep no record.
+- **Trade-off:** Errors are part of the audit trail, and the report reads them from the journal like any other record ("no record is ever deleted" also covers refused events). The replay never stops at a bad event. The cost is that callers must look for rejection records instead of catching an exception.
+
+## D12. The authorization decision uses the balance of the processing day
+
+- **Decision:** `available = balance(value date ≤ today) − active holds`, where "today" is the processing day of the authorization. The hold is approved when `available − amount ≥ 0` (zero is approved).
+- **Alternatives:** Use the event's value date; include future-dated entries.
+- **Trade-off:** It matches what a bank can know at the moment of the decision. In this stream no event has a value date later than its processing day, so the alternatives give the same results. The decision is final: a later back-dated entry does not re-open it (see AMBIGUITIES.md, Auth-B).
+
+## D13. Settlement rules
+
+- **Decision:** A settlement must refer to an authorization that is approved and not settled, on the same account, for an amount not above the hold. It books a `:settlement` debit for the settled amount and releases the **full** hold. Each failed check is its own error code: `unknown-authorization`, `authorization-declined`, `already-settled`, `account-mismatch`, `exceeds-hold`. A second authorization with an existing id is rejected (`duplicate-id`).
+- **Alternatives:** Release only the settled amount and keep the rest on hold; accept a settlement above the hold with a tolerance; accept settlements with no authorization (force post).
+- **Trade-off:** One settlement closes one authorization, so no hold stays open after it with no owner. Separate codes make each refusal visible in the report. The cost is that real card flows with several partial settlements, or tips above the authorized amount, are not supported. If the extra 15.00 of Auth-A stayed on hold, Auth-B would still be declined (−260.00 instead of −245.00), so this choice does not change any verdict.
+
+## D14. The authorization state is derived from records
+
+- **Decision:** `auth-state` folds the records of one authorization id: `:hold/placed` → approved, `:hold/released` → settled, `:auth/declined` → declined. With `:known-at`, it gives the state on any past day.
+- **Alternatives:** Store a status field and update it.
+- **Trade-off:** Same as D5 and D6: one source of truth, past states available for the report. The cost is a scan of the journal for each lookup.

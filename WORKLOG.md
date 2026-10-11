@@ -19,3 +19,4 @@ The build was done with Claude Code (AI coding agent) under my direction.
 - 2026-10-11 10:14 — Step 2: `money` — scale check, HALF_EVEN rounding, split with remainder to the last part.
 - 2026-10-11 10:20 — Step 3: `journal` — append-only journal, balance by value date, known-at view, holds and available balance.
 - 2026-10-11 10:29 — Added DECISIONS.md (design decisions and trade-offs D1–D10) after review feedback: trade-offs must be recorded as they are made.
+- 2026-10-11 10:33 — Step 4: `auth` — approve/decline at available ≥ 0, partial settlement releases the full hold, five settlement rejection codes, duplicate id. DECISIONS D11–D14.
