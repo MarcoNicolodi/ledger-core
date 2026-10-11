@@ -16,3 +16,4 @@ The build was done with Claude Code (AI coding agent) under my direction.
 ## Build
 
 - 2026-10-11 10:08 — Step 1: repository, `deps.edn`, event stream `resources/events.edn`.
+- 2026-10-11 10:14 — Step 2: `money` — scale check, HALF_EVEN rounding, split with remainder to the last part.
