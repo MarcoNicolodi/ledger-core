@@ -7,13 +7,15 @@ Where an option changes an amount, the entry gives the number.
 Engineering choices (how the code is built) are in DECISIONS.md.
 Constants are in NUMBERS.md. Refused criteria are in REJECTED.md.
 
-## Decision principle
+## Decision principles
 
-I used these three steps, in this order:
+The full list, with examples, is in DECISIONS.md. The numbers below match that list:
 
-1. Do what the text says.
-2. Where the text says nothing, add no money movement.
-3. For amounts, choose one point of evaluation and give the reason.
+1. The fixed rules have priority over the acceptance criteria.
+2. Do what the text says.
+3. Where the text is silent, add no money movement.
+4. For amounts, use one point of evaluation, and give the reason.
+5. Make every decision visible.
 
 All amounts below are for ACC-001 (AED) unless the entry names ACC-002 (BHD).
 "Dn" means "value date Day n". "EOD n" means "the end-of-day run of Day n".
@@ -58,7 +60,7 @@ All amounts below are for ACC-001 (AED) unless the entry names ACC-002 (BHD).
   - (a) No refund. Fees stay. Balance after E9: 390.00 (before interest).
   - (b) Refund the 3 fees. Balance after E9: 465.00 (before interest).
 - **Resolution:** (a).
-- **Why:** No rule and no event asks for a refund (principle 2). The ledger is append-only, so booked fees stay. The fee rule checks a close at the time of assessment. It does not define a later correction. I tried (b) during design and abandoned it (see REJECTED.md).
+- **Why:** No rule and no event asks for a refund (principle 3). The append-only rule does not forbid a refund, but nothing triggers one. The fee rule checks a close at the time of assessment. It does not define a later correction. I tried (b) during design and abandoned it (see REJECTED.md).
 
 ### 5. Is a debit checked against the available balance?
 
@@ -87,7 +89,7 @@ All amounts below are for ACC-001 (AED) unless the entry names ACC-002 (BHD).
   - (a) Final balances by value date, at the end of Day 6 (chosen). Interest 0.93. Day 6 close: 390.93. ACC-002: 10.008.
   - (b) Balances as known at each EOD. Interest 0.81. Day 6 close: 390.81. ACC-002: 10.004.
 - **Resolution:** (a).
-- **Why:** Interest is booked only once, at the end of Day 6. At that moment, "closing ledger balance (value_date ≤ that day)" already includes E9 and E10. Fees are different: the engine books each fee at its own assessment, so each fee uses the balance known at that time (principle 3).
+- **Why:** Interest is booked only once, at the end of Day 6. At that moment, "closing ledger balance (value_date ≤ that day)" already includes E9 and E10. Fees are different: the engine books each fee at its own assessment, so each fee uses the balance known at that time (principle 4).
 
 ### 8. Is the capitalized total the sum of the rounded accruals, or the rounded exact sum?
 
@@ -203,7 +205,7 @@ All amounts below are for ACC-001 (AED) unless the entry names ACC-002 (BHD).
 - **Question:** Real card holds expire after some days. The rules give no expiry.
 - **Options:** No expiry; an expiry period.
 - **Resolution:** No expiry inside the 6 days.
-- **Why:** No rule gives a period (principle 2). The replay has no effect: Auth-A is settled, and Auth-B has no hold.
+- **Why:** No rule gives a period (principle 3). The replay has no effect: Auth-A is settled, and Auth-B has no hold.
 
 ### 21. What does "present in the ledger" mean in criterion 4?
 
@@ -242,7 +244,7 @@ All amounts below are for ACC-001 (AED) unless the entry names ACC-002 (BHD).
   - A reversal of a reversal is rejected.
   - A second reversal of the same target is rejected.
   - A reversal of an unknown target is rejected. A rejected event (for example E6) has no entry, so a reversal of it is also rejected.
-- **Why:** A reversal cancels one entry exactly. A second cancellation would move money that no event asks for (principle 2).
+- **Why:** A reversal cancels one entry exactly. A second cancellation would move money that no event asks for (principle 3).
 
 ---
 

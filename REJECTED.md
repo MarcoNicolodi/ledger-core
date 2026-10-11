@@ -31,7 +31,7 @@ The EOD 5 cascade:
 | D4 | 5.00 - 185.00 = -180.00 | yes | -205.00 |
 | D5 | -205.00 | yes | -230.00 |
 
-No reading of the fee rule gives "exactly one fee, on Day 2":
+No reading of the fee rule that keeps one meaning of "day" gives "exactly one fee, on Day 2":
 
 | Reading | Fees | Matches criterion 2? |
 |---|---|---|
@@ -40,8 +40,12 @@ No reading of the fee rule gives "exactly one fee, on Day 2":
 | Fee value date = processing day | 3 (all on D5) | no |
 | Fees from the final ledger only | 0 | no |
 | Each day checked on its close without fees | 3 (D2, D4, D5) | no |
+| One fee per EOD run ("day" = processing day), value date = processing day | 1 (on D5) | no |
+| One fee per EOD run, but value date = first negative day | 1 (on D2) | yes, but see below |
 
-In the last reading, D3 is -370.00 + 400.00 = 30.00 and D4 is 30.00 - 185.00 = -155.00. So D4 and D5 are still negative.
+In the reading "each day checked on its close without fees", D3 is -370.00 + 400.00 = 30.00 and D4 is 30.00 - 185.00 = -155.00. So D4 and D5 are still negative.
+
+The last row is the only way to get "one fee, on Day 2". It uses two meanings of "day" in one rule: "once per day" counts processing days, but the value date uses the checked day. The rule uses "day" for both, so I read it with one meaning. With one meaning, the result is 3 fees (value day) or 1 fee on D5 (processing day).
 
 ### Criterion 6 — refused
 
@@ -54,8 +58,8 @@ At that point, the ACC-001 ledger was 465.00 and there were no fees.
 
 **Reason:**
 
-1. No rule reverses a booked fee. E9 reverses E7 only.
-2. The ledger is append-only, so the engine keeps the fee records.
+1. No rule has a trigger to reverse a booked fee. E9 reverses E7 only. A refund would be a new money movement that no rule and no event asks for (DECISIONS.md, principle 3).
+2. The append-only rule does not forbid a refund: a refund would be a new compensating entry. It only means that the fee records stay visible in any case.
 3. The 75.00 of fees stay. After E9, the balance is 390.00, not 465.00 (both before interest).
 
 **Secondary point:** Without E7, Auth-B would have been approved (465.00 - 90.00 = 375.00).
@@ -134,10 +138,7 @@ b. **The failing test "fees are refunded after E9".**
    Reason: it only tested a feature that I decided not to build, and it repeated the refusal of criterion 6.
 
 c. **The decision principle "choose the reading that adds the least behaviour".**
-   Replaced by the ordered principle:
-   1. Do what the text says.
-   2. Where the text says nothing, add no money movement.
-   3. For amounts, choose one point of evaluation and give the reason.
+   Replaced by the ordered decision principles in DECISIONS.md (rules over criteria; do what the text says; where the text is silent, add no money movement; one point of evaluation for amounts; make every decision visible).
 
    Reason: an independent review showed that the old principle did not explain the fee look-back.
 

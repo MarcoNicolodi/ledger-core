@@ -32,7 +32,7 @@ actual:   0.93M
 ```
 
 The engine rounds each daily accrual and adds the results, so ACC-001 gets 0.93.
-The exact interest is 0.918, which rounds to 0.92, so the design pays 0.01 AED too much for each account in each window.
+The exact interest is 0.918, which rounds to 0.92, so ACC-001 gets 0.01 AED more than the exact interest. ACC-002 has no drift. The error is at most 0.03 per account per window, in either direction, with an average near zero (HALF_EVEN).
 The fix (a reallocation of the daily values) adds a step that the rules do not ask for.
 The test stays red on purpose. All other tests must pass.
 
