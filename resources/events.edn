@@ -1,0 +1,37 @@
+;; Event stream, replayed in this order. Amounts are positive; :event/type
+;; gives the direction. Scale of each amount matches its currency.
+[{:event/id "E1" :event/day 1 :event/type :credit
+  :account/id "ACC-001" :amount 1200.00M :currency :AED :value-date 1}
+
+ {:event/id "E2" :event/day 1 :event/type :debit
+  :account/id "ACC-001" :amount 950.00M :currency :AED :value-date 1}
+
+ {:event/id "E3" :event/day 2 :event/type :authorization
+  :account/id "ACC-001" :auth/id "Auth-A" :amount 200.00M :currency :AED :value-date 2}
+
+ {:event/id "E4" :event/day 3 :event/type :credit
+  :account/id "ACC-001" :amount 400.00M :currency :AED :value-date 3}
+
+ {:event/id "E5" :event/day 4 :event/type :settlement
+  :account/id "ACC-001" :auth/id "Auth-A" :amount 185.00M :currency :AED :value-date 4}
+
+ ;; Auth-Z has no preceding authorization event.
+ {:event/id "E6" :event/day 4 :event/type :settlement
+  :account/id "ACC-001" :auth/id "Auth-Z" :amount 180.00M :currency :AED :value-date 4}
+
+ ;; Back-dated: posted Day 5, value date Day 2.
+ {:event/id "E7" :event/day 5 :event/type :debit
+  :account/id "ACC-001" :amount 620.00M :currency :AED :value-date 2}
+
+ ;; Auth-B is never settled inside the window.
+ {:event/id "E8" :event/day 5 :event/type :authorization
+  :account/id "ACC-001" :auth/id "Auth-B" :amount 90.00M :currency :AED :value-date 5}
+
+ ;; Reversal has no amount: the engine copies it from the target.
+ {:event/id "E9" :event/day 6 :event/type :reversal
+  :account/id "ACC-001" :reversal/target "E7" :value-date 2}
+
+ ;; Listed after a Day 6 event: arrives late. Posted as three instalments.
+ {:event/id "E10" :event/day 5 :event/type :credit
+  :account/id "ACC-002" :amount 10.000M :currency :BHD :value-date 5
+  :instalments 3}]
