@@ -115,3 +115,21 @@ Each entry has the decision, the alternatives, and the trade-off.
 - **Decision:** A reversal event carries no amount. The engine finds the target entries by `:source`, and books one opposite entry for each, with the reversal's value date and `:reversal/target`. It rejects an unknown target, a target that is itself a reversal, and a second reversal of the same target.
 - **Alternatives:** The reversal event carries its own amount; reversals of reversals are allowed.
 - **Trade-off:** The reversed amount cannot differ from the original, and a target with several entries (instalments) is reversed completely. Rejecting chains keeps the meaning of each entry simple. The cost is that a correction of a wrong reversal needs a new normal event, not a reversal of the reversal.
+
+## D19. Fees are booked by an end-of-day run that looks back
+
+- **Decision:** At the close of day N, `eod/assess-fees` checks every day from Day 1 to Day N, in ascending order. A day with a negative closing balance and no fee yet gets one `:fee` entry: value date = that day, posted day = N, with `:fee/for-day` and `:fee/closing-balance` for audit. The run never removes or refunds a fee.
+- **Alternatives:** Check only day N; recalculate all fees from the final ledger; refund a fee when a later event makes its day positive.
+- **Trade-off:** A back-dated entry (E7) gets its fees at the next close, and each fee shows the balance that caused it. The ascending order is necessary, because a fee changes the balance of later days (the Day 2 fee makes Day 3 5.00, not 30.00). The cost is a scan of all past days at every close, and fees that stay after the reversal that removed their cause (see AMBIGUITIES.md and REJECTED.md).
+
+## D20. The window constants have their own namespace
+
+- **Decision:** `ledger.window` holds `first-day`, `last-day` and `in-window?`. Both the engine and the end-of-day run use it.
+- **Alternatives:** Keep the constants in `engine`.
+- **Trade-off:** `engine` requires `eod`, so `eod` cannot require `engine` (circular dependency). A small shared namespace removes the cycle.
+
+## D21. A fee that cannot be booked is an error record, once per day
+
+- **Decision:** The fee is defined only in AED (`overdraft-fee {:AED 25.00M}`). For a negative BHD day, the run appends a `:rejection` with `:fee/no-fx-rate` and `:fee/for-day`. The same day never gets a second error.
+- **Alternatives:** Convert 25.00 AED with an invented rate; book 25.000 BHD; ignore the case.
+- **Trade-off:** The engine never invents a rate or an amount, and the gap is visible in the report. The cost is that a negative BHD account pays no fee until someone defines the fee for BHD. The replay never makes ACC-002 negative.

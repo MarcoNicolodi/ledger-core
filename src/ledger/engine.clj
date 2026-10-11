@@ -4,10 +4,8 @@
             [ledger.auth :as auth]
             [ledger.eod :as eod]
             [ledger.journal :as journal]
-            [ledger.money :as money]))
-
-(def first-day 1)
-(def last-day 6)
+            [ledger.money :as money]
+            [ledger.window :refer [first-day last-day in-window?]]))
 
 (def accounts
   {"ACC-001" {:currency :AED :opening-balance 0.00M}
@@ -18,9 +16,6 @@
 
 (defn initial-state [accounts]
   (assoc (journal/empty-ledger accounts) :day first-day))
-
-(defn- in-window? [day]
-  (<= first-day day last-day))
 
 (def ^:private money-event? #{:credit :debit :authorization :settlement})
 
