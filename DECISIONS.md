@@ -1,10 +1,35 @@
 # Design decisions and trade-offs
 
-This file records engineering choices: how the code is built.
+This file records the decision principles, then the engineering choices: how the code is built.
 How I read the rules is in AMBIGUITIES.md. Constants are in NUMBERS.md.
 Refused criteria and abandoned approaches are in REJECTED.md.
 
 Each entry has the decision, the alternatives, and the trade-off.
+
+---
+
+## Decision principles
+
+Where the rules are unclear or silent, I apply these principles in this order.
+
+1. **The fixed rules have priority over the acceptance criteria.** The rules are "non-negotiable"; the criteria are not. A criterion that contradicts a rule or the arithmetic is refused (REJECTED.md).
+2. **Do what the text says.** Read the fixed rules literally first.
+   - Example: the fee look-back comes from "(all entries with value_date ≤ that day)". Criterion 1 confirms that fees are assessed at the end of Day 5, after the back-dated E7.
+3. **Where the text is silent, add no money movement.** Only an event in the stream or a fixed rule can move money.
+   - Example: no fee refund after the reversal E9. No rule and no event asks for it.
+   - Example: no FX conversion for a fee on the BHD account (D21). No tolerance for a settlement above its hold (D13).
+4. **For amounts, use one point of evaluation, and give the reason.** Each rule books money at one moment, and it uses the ledger as it is at that moment.
+   - Example: a fee is booked at the close of a day, so it uses the balances known at that close. Interest is booked only at the close of Day 6, so it uses the balances at that moment (E9 included).
+5. **Make every decision visible.** Each interpretation of a rule goes in AMBIGUITIES.md with its effect on the numbers. Each engineering choice goes in this file with its trade-off.
+
+### How these principles give "no fee refund"
+
+- Principle 2: the fee rule says a fee is "assessed … when" the closing balance is negative, and "booked". At the close of Day 5, Day 2, Day 4 and Day 5 were negative, so three fees were booked.
+- Principle 3: the rules say nothing about un-booking a fee when a later event makes its day positive. A refund is a new money movement that nothing asks for, so the engine does not add one.
+- The append-only rule keeps the three fee records in any case. A refund would need new compensating entries, which is the money movement that principle 3 excludes.
+- Consequence: after E9 the fees (75.00) stay, and criterion 6 is refused. A real bank would probably waive these fees, but that is a business policy outside these rules (AMBIGUITIES.md).
+
+An earlier version of the principles was "choose the reading that adds the least behaviour". An independent review showed that it did not explain the fee look-back, which adds two fees. It was replaced by the list above (REJECTED.md).
 
 ---
 
