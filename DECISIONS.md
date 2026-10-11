@@ -133,3 +133,10 @@ Each entry has the decision, the alternatives, and the trade-off.
 - **Decision:** The fee is defined only in AED (`overdraft-fee {:AED 25.00M}`). For a negative BHD day, the run appends a `:rejection` with `:fee/no-fx-rate` and `:fee/for-day`. The same day never gets a second error.
 - **Alternatives:** Convert 25.00 AED with an invented rate; book 25.000 BHD; ignore the case.
 - **Trade-off:** The engine never invents a rate or an amount, and the gap is visible in the report. The cost is that a negative BHD account pays no fee until someone defines the fee for BHD. The replay never makes ACC-002 negative.
+
+## D22. Interest is calculated once, at the close of Day 6, and keeps an audit trail
+
+- **Decision:** At the close of Day 6, `eod/capitalize` calculates one accrual for each day of the window from the balances by value date at that moment (so E9 is included). Each day: `raw = balance × 0.0004` when the balance is above zero, else 0; `amount = round(raw)` at the currency scale. The run appends one `:accrual` record for each day (balance, raw, amount), then one `:interest` credit with value date Day 6 whose amount is the sum of the rounded accruals. All accruals are calculated before any record is appended, so the Day 6 accrual never includes the capitalization credit.
+- **Alternatives:** Book an accrual at each end of day from the balances known then; calculate the credit as `round(sum of raw)` and adjust the daily values to match.
+- **Trade-off:** The `:accrual` records make "the rounded accruals sum exactly to the capitalized total" checkable from the journal itself, and the equality holds by construction. The credit follows the value dates, like the rule's definition of the closing balance. The cost is the rounding drift: the rounded accruals add up to 0.93, the exact interest is 0.918 (0.92). The known failing test shows this.
+- **Detail:** A day with zero interest still gets an `:accrual` record (amount 0). An account whose total is zero gets no `:interest` entry, because an entry of 0.00 moves no money.

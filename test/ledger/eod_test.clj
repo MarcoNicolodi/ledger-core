@@ -49,7 +49,7 @@
       (let [reversed (-> state
                          (engine/process {:event/id "E9" :event/day 6 :event/type :reversal
                                           :account/id "ACC-001" :reversal/target "E7" :value-date 2})
-                         (eod/close-day 6))]
+                         (eod/assess-fees "ACC-001" 6))]
         (is (= 3 (count (fees reversed "ACC-001"))))
         (is (= 390.00M (journal/balance reversed "ACC-001" 6)))))))
 
@@ -68,3 +68,43 @@
                   (filter #(= :rejection (:record/type %)))
                   (map (juxt :error/code :fee/for-day)))))
       (is (= -1.000M (journal/balance state "ACC-002" 2))))))
+
+(defn- accrual-records [state account-id]
+  (filter #(= :accrual (:record/type %)) (journal/records state account-id)))
+
+(defn- interest-entry [state account-id]
+  (first (filter #(= :interest (:entry/kind %)) (journal/entries state account-id))))
+
+(deftest interest-capitalization
+  (let [state (engine/replay engine/accounts (engine/load-events))]
+    (testing "ACC-001 accrues on the final balances by value date, rounded each day"
+      (is (= [250.00M 225.00M 625.00M 415.00M 390.00M 390.00M] (map :balance (accrual-records state "ACC-001"))))
+      (is (= [0.10M 0.09M 0.25M 0.17M 0.16M 0.16M] (map :amount (accrual-records state "ACC-001"))))
+      (is (= 0.166M (:raw (nth (accrual-records state "ACC-001") 3)))))
+
+    (testing "the capitalized credit equals the sum of the rounded accruals"
+      (is (= 0.93M
+             (:amount (interest-entry state "ACC-001"))
+             (reduce + (map :amount (accrual-records state "ACC-001"))))))
+
+    (testing "the credit is booked once, at the end of Day 6, with value date Day 6"
+      (is (= [6 6] ((juxt :posted-day :value-date) (interest-entry state "ACC-001"))))
+      (is (= 390.93M (journal/balance state "ACC-001" 6))))
+
+    (testing "the Day 6 accrual uses the balance before the capitalization credit"
+      (is (= 390.00M (:balance (last (accrual-records state "ACC-001"))))))
+
+    (testing "ACC-002 accrues only on Day 5 and Day 6, at its own scale"
+      (is (= [0.000M 0.000M 0.000M 0.000M 0.004M 0.004M] (map :amount (accrual-records state "ACC-002"))))
+      (is (= "0.008" (str (:amount (interest-entry state "ACC-002")))))
+      (is (= "10.008" (str (journal/balance state "ACC-002" 6)))))))
+
+(deftest interest-thresholds
+  (testing "zero and negative days accrue nothing"
+    (let [state (eod/capitalize (run (event "C" 1 :credit 100.00M) (event "D" 2 :debit 100.00M) (event "N" 4 :debit 50.00M)) "ACC-001" 6)]
+      (is (= [0.04M 0.00M 0.00M 0.00M 0.00M 0.00M] (map :amount (accrual-records state "ACC-001"))))))
+
+  (testing "an account with no positive day gets accrual records but no interest entry"
+    (let [state (eod/capitalize (run) "ACC-002" 6)]
+      (is (= 6 (count (accrual-records state "ACC-002"))))
+      (is (nil? (interest-entry state "ACC-002"))))))
