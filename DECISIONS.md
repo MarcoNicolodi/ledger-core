@@ -91,3 +91,27 @@ Each entry has the decision, the alternatives, and the trade-off.
 - **Decision:** `auth-state` folds the records of one authorization id: `:hold/placed` → approved, `:hold/released` → settled, `:auth/declined` → declined. With `:known-at`, it gives the state on any past day.
 - **Alternatives:** Store a status field and update it.
 - **Trade-off:** Same as D5 and D6: one source of truth, past states available for the report. The cost is a scan of the journal for each lookup.
+
+## D15. Events are dispatched with a multimethod on `:event/type`
+
+- **Decision:** `engine/apply-event` is a multimethod. Validation runs once, before dispatch. An unknown type is rejected by the `:default` method.
+- **Alternatives:** One `case` on the event type.
+- **Trade-off:** A new event type is one new method, and no existing code changes. The cost is that the dispatch table is spread over several definitions.
+
+## D16. Validation happens at the boundary, in a fixed order
+
+- **Decision:** Before any handler runs, the engine checks: event day in the window, known account, value date in the window, and (for money events) currency equal to the account currency and a valid amount. The first failed check gives the error code.
+- **Alternatives:** Each handler validates its own input.
+- **Trade-off:** Handlers can trust their input, and every event type gets the same checks. The cost is that an event with several problems reports only the first one.
+
+## D17. The day clock moves forward only
+
+- **Decision:** The engine keeps `:day`. When an event has a later day, the engine first closes every day in between (`eod/close-day`). An event with an earlier day is not rejected: it is posted in the current day with `:late? true` and its original `:event-day`. After the stream, the engine closes the remaining days up to Day 6.
+- **Alternatives:** Reject late events; sort the stream by day before the replay; re-open closed days.
+- **Trade-off:** The stream order is the authority ("replayed in this order"), and a closed day stays closed, as in a real bank. E10 keeps its value date (Day 5), so its money still counts for Day 5. The cost is that the as-known report for Day 5 cannot show E10, because the bank did not have it at the end of Day 5.
+
+## D18. A reversal copies its target
+
+- **Decision:** A reversal event carries no amount. The engine finds the target entries by `:source`, and books one opposite entry for each, with the reversal's value date and `:reversal/target`. It rejects an unknown target, a target that is itself a reversal, and a second reversal of the same target.
+- **Alternatives:** The reversal event carries its own amount; reversals of reversals are allowed.
+- **Trade-off:** The reversed amount cannot differ from the original, and a target with several entries (instalments) is reversed completely. Rejecting chains keeps the meaning of each entry simple. The cost is that a correction of a wrong reversal needs a new normal event, not a reversal of the reversal.

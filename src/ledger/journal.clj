@@ -51,10 +51,11 @@
      (active-holds state account-id :known-at known-at)))
 
 (defn event-record [event day record-type]
-  {:record/type record-type
-   :source      (:event/id event)
-   :posted-day  day
-   :account/id  (:account/id event)})
+  (cond-> {:record/type record-type
+           :source      (:event/id event)
+           :posted-day  day
+           :account/id  (:account/id event)}
+    (:late? event) (assoc :late? true :event-day (:event/day event))))
 
 (defn reject [state event day code detail]
   (append state (assoc (event-record event day :rejection)

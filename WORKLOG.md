@@ -20,3 +20,4 @@ The build was done with Claude Code (AI coding agent) under my direction.
 - 2026-10-11 10:20 — Step 3: `journal` — append-only journal, balance by value date, known-at view, holds and available balance.
 - 2026-10-11 10:29 — Added DECISIONS.md (design decisions and trade-offs D1–D10) after review feedback: trade-offs must be recorded as they are made.
 - 2026-10-11 10:33 — Step 4: `auth` — approve/decline at available ≥ 0, partial settlement releases the full hold, five settlement rejection codes, duplicate id. DECISIONS D11–D14.
+- 2026-10-11 10:41 — Step 5: `engine` — boundary validation, multimethod dispatch, instalments, reversal, forward-only day clock with late arrivals; `eod/close-day` is a no-op stub. DECISIONS D15–D18. Started a subagent to draft README/NUMBERS/AMBIGUITIES/REJECTED outside the repo.
